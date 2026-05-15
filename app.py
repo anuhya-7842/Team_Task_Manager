@@ -14,16 +14,21 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
-
 @app.route("/")
 def home():
     return render_template("index.html")
-
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
 
     if request.method == "POST":
+
+        existing_user = User.query.filter_by(
+            email=request.form['email']
+        ).first()
+
+        if existing_user:
+            return "Email already exists"
 
         hashed_password = bcrypt.generate_password_hash(
             request.form['password']
@@ -43,7 +48,6 @@ def signup():
 
     return render_template("signup.html")
 
-
 @app.route("/login", methods=["GET", "POST"])
 def login():
 
@@ -59,27 +63,19 @@ def login():
         ):
 
             session['user'] = user.email
-            session['role'] = user.role
 
             return redirect("/dashboard")
 
-    return render_template("login.html")
+        return "Invalid Email or Password"
 
+    return render_template("login.html")
 
 @app.route("/dashboard")
 def dashboard():
-
-    if 'user' not in session:
-        return redirect("/login")
-
     return render_template("dashboard.html")
-
 
 @app.route("/create_project", methods=["GET", "POST"])
 def create_project():
-
-    if session.get('role') != "Admin":
-        return "Access Denied"
 
     if request.method == "POST":
 
@@ -95,12 +91,8 @@ def create_project():
 
     return render_template("create_project.html")
 
-
 @app.route("/create_task", methods=["GET", "POST"])
 def create_task():
-
-    if session.get('role') != "Admin":
-        return "Access Denied"
 
     if request.method == "POST":
 
@@ -118,12 +110,8 @@ def create_task():
 
     return render_template("create_task.html")
 
-
 @app.route("/tasks")
 def tasks():
-
-    if 'user' not in session:
-        return redirect("/login")
 
     all_tasks = Task.query.all()
 
@@ -132,15 +120,35 @@ def tasks():
         tasks=all_tasks
     )
 
+@app.route("/forgot_password", methods=["GET", "POST"])
+def forgot_password():
+
+    if request.method == "POST":
+
+        user = User.query.filter_by(
+            email=request.form['email']
+        ).first()
+
+        if user:
+
+            user.password = bcrypt.generate_password_hash(
+                request.form['new_password']
+            ).decode('utf-8')
+
+            db.session.commit()
+
+            return redirect("/login")
+
+        return "User not found"
+
+    return render_template("forgot_password.html")
 
 @app.route("/logout")
 def logout():
 
     session.pop('user', None)
-    session.pop('role', None)
 
     return redirect("/login")
-
 
 if __name__ == "__main__":
     app.run(debug=True)
